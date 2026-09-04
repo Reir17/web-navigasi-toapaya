@@ -227,7 +227,7 @@ export default function HomePage() {
 
       <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
         
-        {/* SIDEBAR PANEL KIRI (Di Mobile: Bottom Sheet Drawer) */}
+        {/* SIDEBAR PANEL KIRI */}
         <aside
           className={`bg-slate-900/95 backdrop-blur-2xl flex flex-col z-30 shadow-2xl transition-all duration-300 ease-in-out shrink-0 ${
             isSidebarOpen && !showHeroGlobe
@@ -235,7 +235,6 @@ export default function HomePage() {
               : 'fixed md:relative inset-x-0 bottom-0 md:inset-auto w-full md:w-0 h-0 md:h-full opacity-0 translate-y-full md:-translate-x-full pointer-events-none border-none'
           }`}
         >
-          {/* Handle Drag Indicator untuk Mobile */}
           <div className="w-12 h-1 bg-slate-700/60 rounded-full mx-auto my-2 md:hidden shrink-0" />
 
           <div className="w-full md:w-[380px] flex flex-col h-full max-h-full min-h-0 shrink-0">
@@ -243,8 +242,6 @@ export default function HomePage() {
             {/* Header Sidebar */}
             <div className="p-3 sm:p-4 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur shrink-0">
               <div className="flex items-center justify-between mb-2.5">
-                
-                {/* Logo & Judul Klik-able */}
                 <button
                   onClick={() => setShowHeroGlobe(true)}
                   className="flex items-center gap-2.5 text-left group transition hover:opacity-90 active:scale-95"
@@ -537,10 +534,10 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* CONTENT UTAMA HERO (Order Diatur: Globe Di Atas pada Mobile, Kanan pada Desktop) */}
+              {/* CONTENT UTAMA HERO */}
               <div className="relative z-10 my-auto py-4 sm:py-6 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
                 
-                {/* 1. GLOBE SECTION (ORDER-1 MOBILE / ORDER-2 DESKTOP) */}
+                {/* GLOBE SECTION */}
                 <div className="lg:col-span-6 relative flex items-center justify-center order-1 lg:order-2">
                   <div className="hidden sm:flex absolute -top-2 left-4 z-20 bg-slate-900/90 border border-emerald-500/30 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-2xl items-center gap-2.5 text-xs text-white animate-bounce" style={{ animationDuration: '5s' }}>
                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
@@ -562,7 +559,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* 2. TEXT HERO SECTION (ORDER-2 MOBILE / ORDER-1 DESKTOP) */}
+                {/* TEXT HERO SECTION */}
                 <div className="lg:col-span-6 space-y-3.5 sm:space-y-5 text-center lg:text-left order-2 lg:order-1">
                   <div className="inline-flex items-center gap-2 bg-slate-900/90 border border-emerald-500/30 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full backdrop-blur shadow-inner">
                     <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 animate-spin" style={{ animationDuration: '8s' }} />
@@ -580,7 +577,7 @@ export default function HomePage() {
                     Sistem informasi geografis interaktif berbasis visual 3D. Temukan komoditas unggulan lokal, fasilitas umum, sentra perikanan & pertanian, serta status live dari para pemilik lapak.
                   </p>
 
-                  {/* Stat Grid Mobile Adjusted */}
+                  {/* Stat Grid */}
                   <div className="pt-1 sm:pt-2 grid grid-cols-3 gap-2 sm:gap-3 max-w-md mx-auto lg:mx-0 text-left">
                     <div className="bg-slate-900/60 border border-slate-800 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur shadow-lg">
                       <div className="flex items-center gap-1 text-emerald-400 text-[10px] sm:text-xs font-bold mb-0.5 sm:mb-1">
@@ -607,7 +604,7 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  {/* Hero Action Buttons Mobile Optimized */}
+                  {/* Hero Action Buttons */}
                   <div className="pt-2 sm:pt-3 flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center justify-center lg:justify-start gap-2.5 sm:gap-3">
                     <button
                       onClick={() => setShowHeroGlobe(false)}
@@ -633,7 +630,7 @@ export default function HomePage() {
 
               {/* FOOTER HERO */}
               <div className="relative z-10 w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-[10px] sm:text-[11px] text-slate-400 border-t border-slate-800/80 pt-3 gap-1.5 text-center sm:text-left">
-                <p>© 2026 KKN 27 Desa Toapaya — Sistem Pemetaan Geospasial UMKM</p>
+                <p>© 2026 KKN Desa Toapaya — Sistem Pemetaan Geospasial UMKM</p>
                 <div className="flex items-center gap-4">
                   <span className="text-slate-400">Presisi Koordinat & Data Terverifikasi</span>
                 </div>
@@ -644,7 +641,7 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* MODAL DETAIL LOKASI (MOBILE BOTTOM SHEET & DESKTOP CENTERED MODAL) */}
+      {/* MODAL DETAIL LOKASI */}
       {selectedUMKM && (
         <div 
           onClick={() => setSelectedUMKM(null)}
@@ -654,7 +651,7 @@ export default function HomePage() {
             onClick={(e) => e.stopPropagation()}
             className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl relative max-h-[85vh] sm:max-h-[90vh] overflow-y-auto flex flex-col gap-4 text-white"
           >
-            {/* Header Image & Close Button */}
+            {/* Gambar Header & Tombol Tutup */}
             <div className="relative w-full h-44 sm:h-52 rounded-2xl overflow-hidden shrink-0 bg-slate-800">
               <img 
                 src={selectedUMKM.foto || 'https://images.unsplash.com/photo-1550258987-190a2d41a8ba?auto=format&fit=crop&w=800&q=80'} 
@@ -677,7 +674,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Content Details */}
+            {/* Konten Detail */}
             <div className="space-y-3">
               <div>
                 <h2 className="text-lg sm:text-xl font-extrabold text-white">{selectedUMKM.nama}</h2>
@@ -714,7 +711,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Actions / Contact Buttons */}
+            {/* Tombol Aksi & Kontak */}
             <div className="pt-2 flex flex-col xs:flex-row gap-2 border-t border-slate-800/80">
               {selectedUMKM.kontak && (
                 <a
@@ -745,8 +742,7 @@ export default function HomePage() {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        onLoginSuccess={handleLoginSuccess}
-        umkmList={umkmList}
+        onSuccess={handleLoginSuccess}
       />
 
       {currentOwner && (

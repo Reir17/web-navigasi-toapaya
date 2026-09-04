@@ -24,7 +24,7 @@ const createCustomPin = (item: UMKM, isSelected: boolean) => {
   let emoji = '🌱';
   let badgeColor = 'bg-emerald-600';
 
-  if (item.kategori === 'tani') {
+  if (item.kategori === 'tani_ikan') {
     emoji = '🍍';
     badgeColor = 'bg-emerald-600';
   } else if (item.kategori === 'kuliner') {

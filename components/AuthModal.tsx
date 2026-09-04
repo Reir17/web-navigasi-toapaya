@@ -8,11 +8,11 @@ import { X, Store, Building2, Lock, Phone, CheckCircle2, AlertCircle, MessageSqu
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (umkm: UMKM) => void;
-  umkmList?: UMKM[]; // Ditambahkan agar tidak error di app/page.tsx
+  onSuccess: (umkm: UMKM) => void; // Disesuaikan dengan onSuccess di page.tsx
+  umkmList?: UMKM[];
 }
 
-export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -55,7 +55,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
 
     try {
       const cleanWa = loginWa.trim().replace(/^0/, '62');
-      
+
       const { data, error } = await supabase
         .from('umkm')
         .select('*')
@@ -75,7 +75,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         return;
       }
 
-      onLoginSuccess(data as UMKM);
+      onSuccess(data as UMKM);
       onClose();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Gagal login.';
@@ -145,7 +145,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         {/* Tab Switcher */}
         <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-5">
           <button
-            onClick={() => { setTab('login'); setErrorMsg(''); }}
+            onClick={() => {
+              setTab('login');
+              setErrorMsg('');
+            }}
             className={`flex-1 py-2 rounded-xl font-bold text-xs transition ${
               tab === 'login' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
             }`}
@@ -153,7 +156,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
             Masuk Pemilik
           </button>
           <button
-            onClick={() => { setTab('register'); setErrorMsg(''); }}
+            onClick={() => {
+              setTab('register');
+              setErrorMsg('');
+            }}
             className={`flex-1 py-2 rounded-xl font-bold text-xs transition ${
               tab === 'register' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
             }`}

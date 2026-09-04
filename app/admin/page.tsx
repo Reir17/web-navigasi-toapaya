@@ -263,12 +263,18 @@ export default function AdminPage() {
     }
   };
 
-  // Full Edit Modal Setup
+ // Full Edit Modal Setup
   const handleOpenFullEdit = (item: UMKM) => {
     setFullEditItem(item);
+    
+    // Konversi array produk menjadi string berpisah koma untuk input form
+    const produkString = Array.isArray(item.produk) 
+      ? item.produk.join(', ') 
+      : (item.produk as unknown as string) || '';
+
     setEditFormData({
       ...item,
-      produk: Array.isArray(item.produk) ? item.produk.join(', ') : item.produk || '',
+      produk: produkString as any, // Cast sebagai any agar tidak bentrok dengan tipe UMKM['produk']
     });
   };
 
@@ -276,16 +282,23 @@ export default function AdminPage() {
     e.preventDefault();
     if (!fullEditItem) return;
 
-    const produkArray = typeof editFormData.produk === 'string' && editFormData.produk
-      ? editFormData.produk
-          .split(',')
-          .map((p) => p.trim())
-          .filter((p) => p !== '')
-      : editFormData.produk;
+    // Ambil data produk dan tangani tipenya
+    const rawProduk = (editFormData as any).produk;
+
+    let produkArray: string[] | null = null;
+
+    if (typeof rawProduk === 'string' && rawProduk.trim() !== '') {
+      produkArray = rawProduk
+        .split(',')
+        .map((p: string) => p.trim())
+        .filter((p: string) => p !== '');
+    } else if (Array.isArray(rawProduk)) {
+      produkArray = rawProduk;
+    }
 
     const updatedData = {
       ...editFormData,
-      produk: Array.isArray(produkArray) && produkArray.length > 0 ? produkArray : null,
+      produk: produkArray && produkArray.length > 0 ? produkArray : null,
     };
 
     const { error } = await supabase
