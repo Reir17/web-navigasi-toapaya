@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-// Kombinasi kata "TOAPAYA" dan tanda baca pendukung
 const TEXT_SEQUENCE = ['W', 'A', 'M', 'B', 'U', 'L', '✦', '•', '+', '°', '✧', '•', '◇'];
 
 interface BurstParticle {
@@ -27,6 +26,12 @@ export default function Globe3D() {
   });
 
   const burstParticlesRef = useRef<BurstParticle[]>([]);
+  
+  // State & Ref untuk Easter Egg 10 Klik
+  const [showThankYou, setShowThankYou] = useState(false);
+  const clickCountRef = useRef(0);
+  const clickResetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const thankYouTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -35,14 +40,32 @@ export default function Globe3D() {
     if (!ctx) return;
 
     let animationFrameId: number;
-    let width = (canvas.width = canvas.parentElement?.clientWidth || 600);
-    let height = (canvas.height = canvas.parentElement?.clientHeight || 600);
+    let parentWidth = canvas.parentElement?.clientWidth || 600;
+    let parentHeight = canvas.parentElement?.clientHeight || 600;
+    
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const isMobile = parentWidth < 768;
 
+    const setupCanvasSize = () => {
+      parentWidth = canvas.parentElement?.clientWidth || 600;
+      parentHeight = canvas.parentElement?.clientHeight || 600;
+      
+      canvas.width = parentWidth * dpr;
+      canvas.height = parentHeight * dpr;
+      canvas.style.width = `${parentWidth}px`;
+      canvas.style.height = `${parentHeight}px`;
+
+      ctx.scale(dpr, dpr);
+    };
+
+    setupCanvasSize();
+
+    let width = parentWidth;
+    let height = parentHeight;
     const radius = Math.min(width, height) * 0.38;
 
-    // Membuat multi-loop path orbit berisi kata "TOAPAYA"
-    const loopCount = 14;
-    const itemsPerLoop = 35;
+    const loopCount = isMobile ? 8 : 14;
+    const itemsPerLoop = isMobile ? 22 : 35;
     const paths: {
       char: string;
       theta: number;
@@ -68,7 +91,7 @@ export default function Globe3D() {
           inclination,
           azimuth,
           speedOffset: 0.7 + (l % 3) * 0.25,
-          baseSize: 'WAMBUL'.includes(char) ? 14 : 10,
+          baseSize: 'WAMBUL'.includes(char) ? (isMobile ? 11 : 14) : (isMobile ? 8 : 10),
           isLetter: 'WAMBUL'.includes(char),
         });
         seqIdx++;
@@ -91,7 +114,7 @@ export default function Globe3D() {
       const centerX = width / 2;
       const centerY = height / 2;
 
-      // Glow Latar Belakang (Radial Ambient Illumination)
+      // Glow Latar Belakang
       const glowGrad = ctx.createRadialGradient(
         centerX, centerY, radius * 0.3,
         centerX, centerY, radius * 1.4
@@ -104,7 +127,7 @@ export default function Globe3D() {
       ctx.arc(centerX, centerY, radius * 1.4, 0, Math.PI * 2);
       ctx.fill();
 
-      // Render Aliran Huruf & Simbol 3D Globe
+      // Render Globe
       paths.forEach((item) => {
         item.theta += 0.006 * item.speedOffset;
 
@@ -149,19 +172,24 @@ export default function Globe3D() {
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
-          // Huruf TOAPAYA diberi aksen emas/neon hijau menyala
           if (mouseGlow > 0.2) {
             ctx.fillStyle = `rgba(167, 243, 208, ${alpha})`;
-            ctx.shadowColor = '#34d399';
-            ctx.shadowBlur = 12;
+            if (!isMobile) {
+              ctx.shadowColor = '#34d399';
+              ctx.shadowBlur = 12;
+            }
           } else if (item.isLetter) {
             ctx.fillStyle = `rgba(52, 211, 153, ${alpha})`;
-            ctx.shadowColor = '#10b981';
-            ctx.shadowBlur = 6;
+            if (!isMobile) {
+              ctx.shadowColor = '#10b981';
+              ctx.shadowBlur = 6;
+            }
           } else {
             ctx.fillStyle = `rgba(110, 231, 183, ${alpha * 0.7})`;
-            ctx.shadowColor = '#059669';
-            ctx.shadowBlur = 2;
+            if (!isMobile) {
+              ctx.shadowColor = '#059669';
+              ctx.shadowBlur = 2;
+            }
           }
 
           ctx.fillText(item.char, screenX, screenY);
@@ -169,7 +197,7 @@ export default function Globe3D() {
         }
       });
 
-      // Render & Update Click-Burst Particles
+      // Render Burst Particles
       const bursts = burstParticlesRef.current;
       for (let i = bursts.length - 1; i >= 0; i--) {
         const p = bursts[i];
@@ -183,8 +211,10 @@ export default function Globe3D() {
         ctx.save();
         ctx.font = `bold ${Math.round(p.size)}px sans-serif`;
         ctx.fillStyle = p.color.replace('ALPHA', p.alpha.toFixed(2));
-        ctx.shadowColor = '#34d399';
-        ctx.shadowBlur = 8;
+        if (!isMobile) {
+          ctx.shadowColor = '#34d399';
+          ctx.shadowBlur = 8;
+        }
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(p.char, p.x, p.y);
@@ -200,13 +230,23 @@ export default function Globe3D() {
 
     render();
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const updatePointerPos = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
       mousePosRef.current = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: clientX - rect.left,
+        y: clientY - rect.top,
         isHovered: true,
       };
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      updatePointerPos(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        updatePointerPos(e.touches[0].clientX, e.touches[0].clientY);
+      }
     };
 
     const handleMouseLeave = () => {
@@ -215,53 +255,109 @@ export default function Globe3D() {
       mousePosRef.current.y = -9999;
     };
 
-    const handleClick = (e: MouseEvent) => {
+    // Fungsi Trigger Partikel Spesial
+    const triggerBurst = (clientX: number, clientY: number, isSpecial = false) => {
       const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
+      const clickX = clientX - rect.left;
+      const clickY = clientY - rect.top;
 
-      const burstCount = 30;
-      const colors = [
-        'rgba(52, 211, 153, ALPHA)',
-        'rgba(167, 243, 208, ALPHA)',
-        'rgba(251, 191, 36, ALPHA)',
-      ];
+      const burstCount = isSpecial ? (isMobile ? 40 : 80) : isMobile ? 12 : 30;
+      const colors = isSpecial
+        ? [
+            'rgba(251, 191, 36, ALPHA)', // Emas
+            'rgba(245, 158, 11, ALPHA)', // Amber
+            'rgba(52, 211, 153, ALPHA)',  // Emerald
+            'rgba(255, 255, 255, ALPHA)', // Putih
+          ]
+        : [
+            'rgba(52, 211, 153, ALPHA)',
+            'rgba(167, 243, 208, ALPHA)',
+            'rgba(251, 191, 36, ALPHA)',
+          ];
 
       for (let i = 0; i < burstCount; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 2 + Math.random() * 6;
+        const speed = isSpecial ? 3 + Math.random() * 9 : 2 + Math.random() * 6;
         const char = TEXT_SEQUENCE[Math.floor(Math.random() * TEXT_SEQUENCE.length)];
         burstParticlesRef.current.push({
           x: clickX,
           y: clickY,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          char,
-          size: 12 + Math.random() * 10,
+          char: isSpecial && Math.random() > 0.5 ? '✦' : char,
+          size: isSpecial ? 16 + Math.random() * 14 : 12 + Math.random() * 10,
           alpha: 1,
           life: 0,
-          maxLife: 35 + Math.random() * 20,
+          maxLife: isSpecial ? 50 + Math.random() * 30 : 35 + Math.random() * 20,
           color: colors[Math.floor(Math.random() * colors.length)],
         });
       }
     };
 
+    // Detektor Spam Klik (10x Klik)
+    const handleSpamClick = (clientX: number, clientY: number) => {
+      clickCountRef.current += 1;
+
+      // Reset hitungan jika pengguna berhenti mengklik selama 1.5 detik
+      if (clickResetTimeoutRef.current) clearTimeout(clickResetTimeoutRef.current);
+      clickResetTimeoutRef.current = setTimeout(() => {
+        clickCountRef.current = 0;
+      }, 1500);
+
+      // Jika mencapai 10 klik!
+      if (clickCountRef.current >= 10) {
+        clickCountRef.current = 0;
+        
+        // Tampilkan Toast
+        setShowThankYou(true);
+        triggerBurst(clientX, clientY, true);
+
+        // Auto hidupkan kembali timer hapus pesan
+        if (thankYouTimeoutRef.current) clearTimeout(thankYouTimeoutRef.current);
+        thankYouTimeoutRef.current = setTimeout(() => {
+          setShowThankYou(false);
+        }, 3500);
+      } else {
+        triggerBurst(clientX, clientY, false);
+      }
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      handleSpamClick(e.clientX, e.clientY);
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        updatePointerPos(e.touches[0].clientX, e.touches[0].clientY);
+        handleSpamClick(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
     const handleResize = () => {
       if (!canvas.parentElement) return;
-      width = canvas.width = canvas.parentElement.clientWidth;
-      height = canvas.height = canvas.parentElement.clientHeight;
+      setupCanvasSize();
+      width = parentWidth;
+      height = parentHeight;
     };
 
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseleave', handleMouseLeave);
     canvas.addEventListener('click', handleClick);
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+    canvas.addEventListener('touchend', handleMouseLeave);
     window.addEventListener('resize', handleResize);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      if (clickResetTimeoutRef.current) clearTimeout(clickResetTimeoutRef.current);
+      if (thankYouTimeoutRef.current) clearTimeout(thankYouTimeoutRef.current);
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
       canvas.removeEventListener('click', handleClick);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchend', handleMouseLeave);
       window.removeEventListener('resize', handleResize);
     };
   }, []);
@@ -269,9 +365,45 @@ export default function Globe3D() {
   return (
     <div className="w-full h-full relative cursor-pointer select-none">
       <canvas ref={canvasRef} className="w-full h-full block" />
+      
+      {/* Easter Egg Popup Toast 10x Klik */}
+      {showThankYou && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none animate-[scaleIn_0.35s_ease-out_forwards]">
+          <div className="relative px-6 py-4 sm:px-8 sm:py-5 rounded-2xl bg-zinc-950/85 backdrop-blur-xl border border-emerald-500/40 shadow-[0_0_50px_rgba(16,185,129,0.35)] flex flex-col items-center justify-center text-center gap-1 group">
+            {/* Glow Aura */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 rounded-2xl blur-lg opacity-40 animate-pulse -z-10" />
+            
+            <span className="text-xs font-mono tracking-widest text-emerald-400/90 uppercase">
+              ✦ EASTER EGG UNLOCKED ✦
+            </span>
+            <h3 className="text-lg sm:text-2xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-300 drop-shadow-md">
+              TERIMA KASIH ORANG BAIK 🙏
+            </h3>
+          </div>
+        </div>
+      )}
+
+      {/* Subtitle Bawah */}
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-emerald-400/60 font-mono tracking-widest uppercase pointer-events-none whitespace-nowrap">
-        ✦ TOAPAYA 3D GLOBE • HOVER / CLICK ✦
+        ✦ TOAPAYA 3D GLOBE • HOVER / SPAM CLICK ✦
       </div>
+
+      {/* Animation Styles */}
+      <style jsx>{`
+        @keyframes scaleIn {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.6) rotate(-3deg);
+          }
+          70% {
+            transform: translate(-50%, -50%) scale(1.08) rotate(1deg);
+          }
+          100% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1) rotate(0deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }
