@@ -1,794 +1,631 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
-import Globe3D from '@/components/Globe3D';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+import { supabase } from '@/lib/supabase';
+import { UMKM, KategoriLokasi, TipeLokasi } from '@/data/umkm';
+import AuthModal from '@/components/AuthModal';
+import EditLapakModal from '@/components/EditLapakModal';
 import {
-  Globe as GlobeIcon,
-  Menu,
-  Shield,
-  Sparkles,
-  Store,
-  Layers,
-  Activity,
-  Compass,
-  X,
-  MessageSquare,
-  ArrowRight,
-  MapPin,
   Search,
-  Filter,
-  User,
+  MapPin,
+  MessageSquare,
+  Store,
+  X,
+  UserCheck,
   LogOut,
   Edit3,
-  CheckCircle2,
-  Phone
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  Globe as GlobeIcon,
+  Sparkles,
+  Compass,
+  ArrowRight,
+  Layers,
+  Activity,
+  Shield,
 } from 'lucide-react';
+import LoadingScreen from '@/components/LoadingScreen';
 
-// ==========================================
-// TYPES & INTERFACES
-// ==========================================
-export interface UMKM {
-  id: string;
-  nama: string;
-  kategori: 'Kuliner' | 'Pertanian' | 'Perikanan' | 'Perdagangan' | 'Jasa' | 'Fasilitas';
-  dusun: 'Dusun I' | 'Dusun II';
-  alamat_lengkap: string;
-  deskripsi: string;
-  produk: string[];
-  kontak: string;
-  lat: number;
-  lng: number;
-  foto?: string;
-  status_owner?: string;
-  owner_username?: string;
-}
+// Dynamic import untuk Leaflet Map
+const MapLeaflet = dynamic(() => import('@/components/MapLeaflet'), {
+  ssr: false,
+  loading: () => <LoadingScreen message="Menyiapkan Peta Interaktif..." />,
+});
 
-// ==========================================
-// DUMMY DATA INITIALIZATIONS
-// ==========================================
-const INITIAL_UMKM_DATA: UMKM[] = [
-  {
-    id: '1',
-    nama: 'Warung Makan Mak Ngah',
-    kategori: 'Kuliner',
-    dusun: 'Dusun I',
-    alamat_lengkap: 'Jl. Lintas Barat KM 18, Desa Toapaya',
-    deskripsi: 'Menyediakan masakan khas Melayu, Otak-otak Bintan, dan Asam Pedas Sembilang segar.',
-    produk: ['Otak-otak', 'Asam Pedas', 'Nasi Dagang', 'Teh Tarik'],
-    kontak: '6281234567890',
-    lat: 0.9852,
-    lng: 104.4721,
-    foto: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
-    status_owner: 'Hari ini ada Otak-Otak Ikan Parang Segar Baru Matang! Stok terbatas.',
-    owner_username: 'makngah'
-  },
-  {
-    id: '2',
-    nama: 'Kebun Tani Makmur Toapaya',
-    kategori: 'Pertanian',
-    dusun: 'Dusun II',
-    alamat_lengkap: 'Kawasan Agrowisata RT 03/RW 02, Desa Toapaya',
-    deskripsi: 'Sentra budidaya buah naga, sayuran hidroponik, dan bibit tanaman unggulan lokal.',
-    produk: ['Buah Naga Red', 'Sawi Hidroponik', 'Bibit Cabai', 'Pupuk Organik'],
-    kontak: '6282288991122',
-    lat: 0.9885,
-    lng: 104.4785,
-    foto: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=800&q=80',
-    status_owner: 'Panen raya buah naga! Diskon khusus beli langsung di lokasi.',
-    owner_username: 'tanimakmur'
-  },
-  {
-    id: '3',
-    nama: 'Kolam Budidaya Gurame & Lele',
-    kategori: 'Perikanan',
-    dusun: 'Dusun I',
-    alamat_lengkap: 'Jl. Pemuda No. 12, Desa Toapaya',
-    deskripsi: 'Pemasok ikan air tawar hidup untuk konsumsi restoran dan rumah tangga.',
-    produk: ['Ikan Gurame Live', 'Lele Sangkuriang', 'Bibit Ikan'],
-    kontak: '6285211223344',
-    lat: 0.9821,
-    lng: 104.4695,
-    foto: 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?auto=format&fit=crop&w=800&q=80',
-    owner_username: 'budidayafish'
-  },
-  {
-    id: '4',
-    nama: 'Toko Kelontong Berkah Desa',
-    kategori: 'Perdagangan',
-    dusun: 'Dusun II',
-    alamat_lengkap: 'Simpang Tiga Desa Toapaya',
-    deskripsi: 'Menyediakan sembako lengkap, gas LPG, serta kebutuhan harian warga.',
-    produk: ['Beras Premium', 'Minyak Goreng', 'Gas 3kg', 'Sembako'],
-    kontak: '6281999887766',
-    lat: 0.9868,
-    lng: 104.4752,
-    foto: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&w=800&q=80'
-  },
-  {
-    id: '5',
-    nama: 'Kantor Desa Toapaya',
-    kategori: 'Fasilitas',
-    dusun: 'Dusun I',
-    alamat_lengkap: 'Jl. Utama Desa Toapaya No. 1',
-    deskripsi: 'Pusat pelayanan administrasi publik dan pemerintahan Desa Toapaya.',
-    produk: ['Pelayanan Surat Keterangan', 'Administrasi Kependudukan'],
-    kontak: '6287711223300',
-    lat: 0.9841,
-    lng: 104.4711,
-    foto: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80'
-  }
-];
-
-// ==========================================
-// SUB-COMPONENTS
-// ==========================================
-
-// Leaflet Map Placeholder / Canvas Integrator
-const MapLeaflet: React.FC<{
-  data: UMKM[];
-  selectedUMKM: UMKM | null;
-  onSelectUMKM: (item: UMKM) => void;
-  centerCoordinates: [number, number];
-}> = ({ data, selectedUMKM, onSelectUMKM }) => {
-  return (
-    <div className="w-full h-full bg-slate-900 relative flex items-center justify-center overflow-hidden">
-      {/* Visual Canvas Grid Background (Simulation of Map Layers) */}
-      <div 
-        className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage: `radial-gradient(#10b981 1px, transparent 1px), radial-gradient(#0ea5e9 1px, #0f172a 1px)`,
-          backgroundSize: '40px 40px',
-          backgroundPosition: '0 0, 20px 20px'
-        }}
-      />
-      
-      {/* Map Control Info Overlay */}
-      <div className="absolute bottom-4 left-4 z-10 bg-slate-950/80 border border-slate-800 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] text-slate-400 pointer-events-none">
-        Map Leaflet Engine Active • Interactive Markers ({data.length})
-      </div>
-      {/* Simulated Interactive Markers */}
-      <div className="relative w-full max-w-2xl h-full flex items-center justify-center">
-        {data.map((item, idx) => {
-          const isSelected = selectedUMKM?.id === item.id;
-          // Offset calculation for demo visualization
-          const topPos = 20 + ((idx * 17) % 60);
-          const leftPos = 15 + ((idx * 23) % 70);
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectUMKM(item)}
-              style={{ top: `${topPos}%`, left: `${leftPos}%` }}
-              className={`absolute group -translate-x-1/2 -translate-y-1/2 transition-all duration-300 z-10 hover:scale-125 focus:outline-none`}
-            >
-              <div className={`p-2 rounded-full border shadow-xl flex items-center justify-center backdrop-blur-md transition ${
-                isSelected 
-                  ? 'bg-emerald-500 border-white text-slate-950 scale-125 shadow-emerald-500/50 ring-4 ring-emerald-500/30' 
-                  : 'bg-slate-900/90 border-emerald-500/60 text-emerald-400 hover:bg-emerald-600 hover:text-white'
-              }`}>
-                <MapPin className="w-5 h-5" />
-              </div>
-              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 bg-slate-950/90 border border-slate-800 text-white text-[10px] font-semibold px-2 py-0.5 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition shadow-lg pointer-events-none">
-                {item.nama}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+// Dynamic import untuk 3D Globe Canvas
+const Globe3D = dynamic(() => import('@/components/Globe3D'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center text-emerald-400/60 text-xs font-mono animate-pulse">
+      Memuat Aliran Globe 3D...
     </div>
-  );
-};
+  ),
+});
 
-// Modal Login Pemilik Lapak
-const AuthModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: (ownerData: UMKM) => void;
-}> = ({ isOpen, onClose, onSuccess }) => {
-  const [username, setUsername] = useState('');
-  if (!isOpen) return null;
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim()) return;
-    
-    // Simple authentication demo logic
-    const found = INITIAL_UMKM_DATA.find(
-      (u) => u.owner_username?.toLowerCase() === username.trim().toLowerCase()
-    );
-    if (found) {
-      onSuccess(found);
-      onClose();
-    } else {
-      alert('Username tidak ditemukan. Gunakan demo username: "makngah" atau "tanimakmur"');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl relative text-white">
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-300 transition"
-          aria-label="Tutup modal"
-        >
-          <X className="w-4 h-4" />
-        </button>
-        <div className="flex items-center gap-2 text-emerald-400 mb-2">
-          <Store className="w-5 h-5" />
-          <h3 className="text-lg font-bold">Login Pemilik Lapak</h3>
-        </div>
-        <p className="text-xs text-slate-400 mb-6">Masukan username pemilik UMKM untuk memperbarui status dan info toko secara realtime.</p>
-        
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Username Lapak</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Contoh: makngah"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
-              required
-            />
-            <p className="text-[10px] text-slate-500 mt-1">Saran demo: ketik <code className="text-emerald-400">makngah</code> atau <code className="text-emerald-400">tanimakmur</code></p>
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 rounded-xl shadow-lg transition active:scale-95"
-          >
-            Masuk ke Dasbor
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Modal Edit Informasi Lapak
-const EditLapakModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  currentData: UMKM;
-  onUpdateSuccess: (updated: UMKM) => void;
-}> = ({ isOpen, onClose, currentData, onUpdateSuccess }) => {
-  const [statusText, setStatusText] = useState(currentData.status_owner || '');
-  const [deskripsi, setDeskripsi] = useState(currentData.deskripsi || '');
-  const [kontak, setKontak] = useState(currentData.kontak || '');
-
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updated: UMKM = {
-      ...currentData,
-      status_owner: statusText,
-      deskripsi,
-      kontak
-    };
-    onUpdateSuccess(updated);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 shadow-2xl relative text-white">
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-300 transition"
-          aria-label="Tutup modal"
-        >
-          <X className="w-4 h-4" />
-        </button>
-        <div className="flex items-center gap-2 text-emerald-400 mb-2">
-          <Edit3 className="w-5 h-5" />
-          <h3 className="text-lg font-bold">Kelola Informasi Lapak</h3>
-        </div>
-        <p className="text-xs text-slate-400 mb-6">Perbarui status live, deskripsi, dan kontak untuk toko: <strong className="text-white">{currentData.nama}</strong></p>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Pesan Live Pemilik (Realtime Update)</label>
-            <input
-              type="text"
-              value={statusText}
-              onChange={(e) => setStatusText(e.target.value)}
-              placeholder="Contoh: Buka hari ini! Stok stok ikan baru tiba."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Deskripsi Singkat Usaha</label>
-            <textarea
-              rows={3}
-              value={deskripsi}
-              onChange={(e) => setDeskripsi(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition resize-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nomor WhatsApp / Kontak</label>
-            <input
-              type="text"
-              value={kontak}
-              onChange={(e) => setKontak(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
-            />
-          </div>
-          <div className="pt-2 flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Simpan Perubahan</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// MAIN PAGE COMPONENT
-// ==========================================
-export default function Page() {
-  // State Utama
-  const [umkmList, setUmkmList] = useState<UMKM[]>(INITIAL_UMKM_DATA);
+export default function HomePage() {
+  const [umkmList, setUmkmList] = useState<UMKM[]>([]);
+  const [filteredList, setFilteredList] = useState<UMKM[]>([]);
   const [selectedUMKM, setSelectedUMKM] = useState<UMKM | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([0.9850, 104.4750]);
-  
-  // State Tampilan & Overlay
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [showHeroGlobe, setShowHeroGlobe] = useState<boolean>(true);
-  
-  // State Filter & Pencarian
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedKategori, setSelectedKategori] = useState<string>('Semua');
-  const [selectedDusun, setSelectedDusun] = useState<string>('Semua');
 
-  // State Auth Pemilik
+  // Toggle Sidebar & Hero View
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [showHeroGlobe, setShowHeroGlobe] = useState(true);
+
+  // Auth & Owner Session
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [currentOwner, setCurrentOwner] = useState<UMKM | null>(null);
-  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const [isEditOpen, setIsEditOpen] = useState<boolean>(false);
 
-  // Helper Badge Kategori
-  const getKategoriBadge = (kategori: string) => {
-    switch (kategori) {
-      case 'Kuliner': return '🍲 Kuliner';
-      case 'Pertanian': return '🌱 Pertanian';
-      case 'Perikanan': return '🐟 Perikanan';
-      case 'Perdagangan': return '🏪 Perdagangan';
-      case 'Jasa': return '🛠️ Jasa';
-      case 'Fasilitas': return '🏛️ Fasilitas Publik';
-      default: return kategori;
-    }
-  };
-
-  // Filtered List Memoization
-  const filteredList = useMemo(() => {
-    return umkmList.filter((item) => {
-      const matchQuery = item.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.deskripsi.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.produk.some(p => p.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      const matchKategori = selectedKategori === 'Semua' || item.kategori === selectedKategori;
-      const matchDusun = selectedDusun === 'Semua' || item.dusun === selectedDusun;
-
-      return matchQuery && matchKategori && matchDusun;
-    });
-  }, [umkmList, searchQuery, selectedKategori, selectedDusun]);
-
-  // Handle Login & Data Updates
-  const handleLoginSuccess = (ownerData: UMKM) => {
-    setCurrentOwner(ownerData);
-    setIsEditOpen(true);
-  };
-
-  const handleUpdateData = (updatedData: UMKM) => {
-    setUmkmList((prev) => prev.map((item) => item.id === updatedData.id ? updatedData : item));
-    if (selectedUMKM?.id === updatedData.id) {
-      setSelectedUMKM(updatedData);
-    }
-    setCurrentOwner(updatedData);
-  };
-
-  // Close modals on Escape key
+  // Ref untuk menghindari stale closure pada callback realtime
+  const currentOwnerRef = useRef(currentOwner);
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedUMKM(null);
-        setIsAuthOpen(false);
-        setIsEditOpen(false);
+    currentOwnerRef.current = currentOwner;
+  }, [currentOwner]);
+
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTipe, setSelectedTipe] = useState<'semua' | TipeLokasi>('semua');
+  const [selectedKategori, setSelectedKategori] = useState<'semua' | KategoriLokasi>('semua');
+  const [selectedDusun, setSelectedDusun] = useState<'semua' | 'Dusun I' | 'Dusun II'>('semua');
+  const [mapCenter, setMapCenter] = useState<[number, number]>([1.0285, 104.5486]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('umkm')
+        .select('*')
+        .eq('status_persetujuan', 'approved')
+        .order('nama', { ascending: true });
+
+      if (!error && data) {
+        setUmkmList(data);
+        if (currentOwnerRef.current) {
+          const updatedOwner = data.find((item) => item.id === currentOwnerRef.current?.id);
+          if (updatedOwner) setCurrentOwner(updatedOwner);
+        }
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    } catch (e) {
+      console.error('Fetch error:', e);
+    }
   }, []);
 
-  return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 font-sans antialiased text-slate-100 selection:bg-emerald-500 selection:text-slate-950">
-      
-      {/* SIDEBAR DIRECTORY & FILTER (Hanya dirender jika tidak sedang menampilkan Hero/Beranda Globe 3D) */}
-      {!showHeroGlobe && (
-        <aside 
-          className={`fixed lg:relative z-40 h-full w-80 sm:w-96 bg-slate-900/95 border-r border-slate-800/80 backdrop-blur-xl flex flex-col transition-all duration-300 ${
-            isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-          }`}
-        >
-          {/* Header Sidebar */}
-          <div className="p-3.5 sm:p-4 border-b border-slate-800/80 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center p-1">
-                <img src="/logo-kkn.png" alt="Logo Desa" className="w-full h-full object-contain" onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }} />
-                <Compass className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <h1 className="text-sm font-extrabold text-white leading-none">Desa Toapaya</h1>
-                <span className="text-[10px] text-slate-400 font-medium">Sistem Pemetaan Geospasial</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
-              aria-label="Tutup sidebar"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+  useEffect(() => {
+    fetchData();
 
-          {/* Search & Filter Controls */}
-          <div className="p-3 sm:p-4 space-y-3 border-b border-slate-800/80 shrink-0">
-            {/* Input Cari */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari UMKM, komoditas, atau layanan..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 transition"
-              />
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs"
-                >
-                  ✕
-                </button>
+    const channel = supabase
+      .channel('realtime_umkm')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'umkm' },
+        () => fetchData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData]);
+
+  useEffect(() => {
+    let result = umkmList || [];
+
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (item) =>
+          (item.nama && item.nama.toLowerCase().includes(q)) ||
+          (item.deskripsi && item.deskripsi.toLowerCase().includes(q)) ||
+          (Array.isArray(item.produk) && item.produk.some((p) => p.toLowerCase().includes(q)))
+      );
+    }
+
+    if (selectedTipe !== 'semua') {
+      result = result.filter((item) => item.tipe_lokasi === selectedTipe);
+    }
+
+    if (selectedKategori !== 'semua') {
+      result = result.filter((item) => item.kategori === selectedKategori);
+    }
+
+    if (selectedDusun !== 'semua') {
+      result = result.filter((item) => item.dusun === selectedDusun);
+    }
+
+    setFilteredList(result);
+  }, [searchQuery, selectedTipe, selectedKategori, selectedDusun, umkmList]);
+
+  const handleSelectLocation = (item: UMKM) => {
+    if (!item) return;
+    setSelectedUMKM(item);
+    setShowHeroGlobe(false);
+    if (item.lat && item.lng) {
+      setMapCenter([item.lat, item.lng]);
+    }
+  };
+
+  const handleLoginSuccess = (ownerData: UMKM) => {
+    setCurrentOwner(ownerData);
+    if (ownerData.lat && ownerData.lng) {
+      setMapCenter([ownerData.lat, ownerData.lng]);
+    }
+  };
+
+  const getKategoriBadge = (kategori: KategoriLokasi) => {
+    switch (kategori) {
+      case 'tani_ikan':
+        return '🌾 Tani & Ikan';
+      case 'kuliner':
+        return '☕ Kuliner';
+      case 'kerajinan':
+        return '🎨 Kerajinan';
+      case 'jasa':
+        return '🔧 Jasa';
+      case 'pemerintahan':
+        return '🏛️ Pemdes';
+      case 'perangkat':
+        return '🏠 Perangkat Desa';
+      default:
+        return '📍 Lokasi';
+    }
+  };
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setSelectedTipe('semua');
+    setSelectedKategori('semua');
+    setSelectedDusun('semua');
+  };
+
+  return (
+    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans flex flex-col antialiased selection:bg-emerald-500 selection:text-slate-950">
+      
+      {/* HEADER / NAVBAR PEMILIK LAPAK */}
+      {currentOwner && (
+        <header className="bg-slate-900/90 border-b border-emerald-500/30 backdrop-blur-xl z-40 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shadow-2xl shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="relative flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center shadow-inner">
+                <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+              </div>
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="text-[8px] sm:text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1 sm:px-1.5 py-0.2 rounded font-bold uppercase tracking-wider shrink-0">
+                  Pemilik Mode
+                </span>
+                <p className="text-xs font-bold text-white truncate">{currentOwner.nama}</p>
+              </div>
+              {currentOwner.status_owner ? (
+                <p className="text-[9px] sm:text-[10px] text-amber-300 font-medium truncate">
+                  💬 &quot;{currentOwner.status_owner}&quot;
+                </p>
+              ) : (
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate">Sapa pengunjung dengan status live...</p>
               )}
             </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setIsEditOpen(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[11px] sm:text-xs py-1.5 px-2.5 sm:px-3 rounded-xl transition shadow-lg active:scale-95"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Kelola Lapak</span>
+            </button>
+            <button
+              onClick={() => setCurrentOwner(null)}
+              title="Keluar Akun"
+              className="p-1.5 bg-slate-800/80 hover:bg-rose-950/80 hover:text-rose-300 text-slate-400 rounded-xl border border-slate-700/80 transition active:scale-95"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+      )}
 
-            {/* Pill Filter Kategori */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
-              {['Semua', 'Kuliner', 'Pertanian', 'Perikanan', 'Perdagangan', 'Jasa', 'Fasilitas'].map((kat) => (
+      <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+        
+        {/* SIDEBAR PANEL KIRI (Di Mobile: Bottom Sheet Drawer) */}
+        <aside
+          className={`bg-slate-900/95 backdrop-blur-2xl flex flex-col z-30 shadow-2xl transition-all duration-300 ease-in-out shrink-0 ${
+            isSidebarOpen && !showHeroGlobe
+              ? 'fixed md:relative inset-x-0 bottom-0 md:inset-auto h-[60vh] md:h-full max-h-[60vh] md:max-h-none w-full md:w-[380px] opacity-100 translate-y-0 md:translate-x-0 rounded-t-3xl md:rounded-none border-t md:border-t-0 md:border-r border-slate-800/80 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] md:shadow-2xl'
+              : 'fixed md:relative inset-x-0 bottom-0 md:inset-auto w-full md:w-0 h-0 md:h-full opacity-0 translate-y-full md:-translate-x-full pointer-events-none border-none'
+          }`}
+        >
+          {/* Handle Drag Indicator untuk Mobile */}
+          <div className="w-12 h-1 bg-slate-700/60 rounded-full mx-auto my-2 md:hidden shrink-0" />
+          <div className="w-full md:w-[380px] flex flex-col h-full max-h-full min-h-0 shrink-0">
+            
+            {/* Header Sidebar */}
+            <div className="p-3 sm:p-4 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur shrink-0">
+              <div className="flex items-center justify-between mb-2.5">
+                
+                {/* Logo & Judul Klik-able */}
                 <button
-                  key={kat}
-                  onClick={() => setSelectedKategori(kat)}
-                  className={`px-2.5 py-1 rounded-lg border whitespace-nowrap transition-all font-medium ${
-                    selectedKategori === kat
-                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
-                      : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  onClick={() => setShowHeroGlobe(true)}
+                  className="flex items-center gap-2.5 text-left group transition hover:opacity-90 active:scale-95"
+                  title="Kembali ke Beranda Globe 3D"
+                >
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-slate-800/80 border border-slate-700/60 p-1.5 flex items-center justify-center shadow-inner group-hover:border-emerald-500/50 transition-colors">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo-kkn.png" alt="Logo KKN" className="w-full h-full object-contain" />
+                  </div>
+                  <div>
+                    <h1 className="text-xs sm:text-sm font-extrabold text-white tracking-tight group-hover:text-emerald-400 transition-colors">
+                      Peta Desa Toapaya
+                    </h1>
+                    <p className="text-[9px] sm:text-[10px] text-emerald-400 font-semibold tracking-wide flex items-center gap-1">
+                      <span>GIS & Direktori UMKM</span>
+                      <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1 rounded border border-emerald-500/30">Globe 3D</span>
+                    </p>
+                  </div>
+                </button>
+                <div className="flex items-center gap-1.5">
+                  {!currentOwner && (
+                    <button
+                      onClick={() => setIsAuthOpen(true)}
+                      className="bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 px-2.5 sm:px-3 rounded-xl border border-emerald-400/30 shadow-lg transition flex items-center gap-1 active:scale-95"
+                    >
+                      <Store className="w-3.5 h-3.5" />
+                      <span>Login</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    title="Sembunyikan Sidebar"
+                    className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition border border-slate-700/80 active:scale-95"
+                  >
+                    <ChevronLeft className="w-4 h-4 hidden md:block" />
+                    <X className="w-4 h-4 md:hidden" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Input Pencarian */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-2.5 sm:top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari UMKM, komoditas, layanan..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-950/80 text-white text-xs rounded-xl pl-8 sm:pl-9 pr-7 py-2 sm:py-2.5 border border-slate-800 focus:outline-none focus:border-emerald-500/80 transition placeholder:text-slate-500"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Switch Filter Tipe */}
+              <div className="grid grid-cols-3 gap-1 mt-2 sm:mt-2.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800/80 text-[10px] sm:text-[11px] font-semibold">
+                <button
+                  onClick={() => setSelectedTipe('semua')}
+                  className={`py-1 rounded-lg transition ${
+                    selectedTipe === 'semua'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {kat}
+                  Semua
                 </button>
-              ))}
+                <button
+                  onClick={() => setSelectedTipe('umkm')}
+                  className={`py-1 rounded-lg transition ${
+                    selectedTipe === 'umkm'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  UMKM
+                </button>
+                <button
+                  onClick={() => setSelectedTipe('non_umkm')}
+                  className={`py-1 rounded-lg transition ${
+                    selectedTipe === 'non_umkm'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Fasilitas
+                </button>
+              </div>
+
+              {/* Dropdown Filters */}
+              <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                <select
+                  value={selectedKategori}
+                  onChange={(e) => setSelectedKategori(e.target.value as 'semua' | KategoriLokasi)}
+                  className="bg-slate-950/80 text-slate-300 text-[10px] sm:text-[11px] rounded-xl p-1.5 sm:p-2 border border-slate-800 focus:outline-none focus:border-emerald-500/80 cursor-pointer"
+                >
+                  <option value="semua">Semua Kategori</option>
+                  <option value="tani_ikan">🌾 Tani & Ikan</option>
+                  <option value="kuliner">☕ Kuliner</option>
+                  <option value="kerajinan">🎨 Kerajinan</option>
+                  <option value="jasa">🔧 Jasa</option>
+                  <option value="pemerintahan">🏛️ Pemdes</option>
+                  <option value="perangkat">🏠 Perangkat Desa</option>
+                </select>
+
+                <select
+                  value={selectedDusun}
+                  onChange={(e) => setSelectedDusun(e.target.value as 'semua' | 'Dusun I' | 'Dusun II')}
+                  className="bg-slate-950/80 text-slate-300 text-[10px] sm:text-[11px] rounded-xl p-1.5 sm:p-2 border border-slate-800 focus:outline-none focus:border-emerald-500/80 cursor-pointer"
+                >
+                  <option value="semua">Semua Dusun</option>
+                  <option value="Dusun I">Dusun I</option>
+                  <option value="Dusun II">Dusun II</option>
+                </select>
+              </div>
+
+              {/* Status Hasil Filter */}
+              <div className="flex items-center justify-between mt-2 px-1 text-[10px] sm:text-[11px] text-slate-400">
+                <span>
+                  Menampilkan <strong className="text-white">{filteredList.length}</strong> lokasi
+                </span>
+                {(searchQuery || selectedTipe !== 'semua' || selectedKategori !== 'semua' || selectedDusun !== 'semua') && (
+                  <button
+                    onClick={resetFilters}
+                    className="text-emerald-400 hover:underline font-medium text-[10px]"
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Filter Dusun */}
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400 font-medium flex items-center gap-1">
-                <Filter className="w-3 h-3 text-emerald-400" />
-                Wilayah:
-              </span>
-              <div className="flex gap-1">
-                {['Semua', 'Dusun I', 'Dusun II'].map((dusun) => (
+            {/* List Lokasi */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-3 space-y-2 overscroll-contain">
+              {filteredList.length === 0 ? (
+                <div className="text-center py-8 px-4 space-y-2">
+                  <div className="w-10 h-10 rounded-2xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-center mx-auto text-slate-500">
+                    <Search className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs text-slate-400 font-medium">Lokasi tidak ditemukan.</p>
                   <button
-                    key={dusun}
-                    onClick={() => setSelectedDusun(dusun)}
-                    className={`px-2 py-0.5 rounded-md border text-[10px] transition ${
-                      selectedDusun === dusun
-                        ? 'bg-emerald-600 border-emerald-500 text-white font-semibold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                    onClick={resetFilters}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold"
+                  >
+                    Bersihkan kata kunci filter
+                  </button>
+                </div>
+              ) : (
+                filteredList.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectLocation(item)}
+                    className={`group p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 cursor-pointer flex gap-2.5 sm:gap-3 items-center relative overflow-hidden active:scale-[0.98] ${
+                      selectedUMKM?.id === item.id
+                        ? 'bg-slate-800/90 border-emerald-500/80 shadow-lg'
+                        : 'bg-slate-950/40 hover:bg-slate-800/50 border-slate-800/80 hover:border-slate-700'
                     }`}
                   >
-                    {dusun}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Scrollable List UMKM */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-            {filteredList.length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <Compass className="w-8 h-8 text-slate-600 mx-auto mb-2 animate-bounce" />
-                <p className="text-xs text-slate-400 font-medium">Tidak ada lokasi ditemukan</p>
-                <p className="text-[10px] text-slate-600 mt-1">Coba sesuaikan kata kunci atau filter Anda</p>
-              </div>
-            ) : (
-              filteredList.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    setSelectedUMKM(item);
-                    setMapCenter([item.lat, item.lng]);
-                  }}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer group flex gap-3 items-start ${
-                    selectedUMKM?.id === item.id
-                      ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-950/40'
-                      : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/60'
-                  }`}
-                >
-                  <div className="w-14 h-14 rounded-xl bg-slate-800 overflow-hidden shrink-0 border border-slate-700/60">
+                    {selectedUMKM?.id === item.id && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-400" />
+                    )}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={item.foto || 'https://images.unsplash.com/photo-1550258987-190a2d41a8ba?auto=format&fit=crop&w=800&q=80'}
                       alt={item.nama}
-                      className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-                      loading="lazy"
+                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover shrink-0 bg-slate-800 border border-slate-700/50"
                     />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
-                        {item.kategori}
-                      </span>
-                      <span className="text-[9px] text-slate-500 bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded">
-                        {item.dusun}
-                      </span>
-                    </div>
-                    <h4 className="text-xs font-bold text-white truncate mt-0.5 group-hover:text-emerald-300 transition">
-                      {item.nama}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {item.alamat_lengkap}
-                    </p>
-                    {item.status_owner && (
-                      <div className="mt-1.5 text-[9px] text-amber-300 bg-amber-950/40 border border-amber-500/30 px-1.5 py-0.5 rounded truncate">
-                        💬 {item.status_owner}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <span className="text-[9px] font-bold text-emerald-300 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800/50 truncate">
+                          {getKategoriBadge(item.kategori)}
+                        </span>
+                        <span className="text-[9px] text-slate-400 bg-slate-800/60 px-1 py-0.2 rounded shrink-0">
+                          {item.dusun}
+                        </span>
                       </div>
-                    )}
+                      <h3 className="font-bold text-white text-xs truncate group-hover:text-emerald-400 transition-colors">
+                        {item.nama}
+                      </h3>
+                      {item.status_owner ? (
+                        <p className="text-[10px] text-amber-300 font-medium truncate mt-0.5">
+                          💬 {item.status_owner}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">{item.alamat_lengkap}</p>
+                      )}
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-300 shrink-0" />
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
 
-          {/* User Profile / Footer Sidebar */}
-          {currentOwner && (
-            <div className="p-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500 flex items-center justify-center text-emerald-400 font-bold text-xs">
-                  {currentOwner.nama.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-white truncate">{currentOwner.nama}</p>
-                  <p className="text-[9px] text-emerald-400 font-semibold">Mode Pemilik Aktif</p>
+            {/* Footer Sidebar */}
+            <div className="p-2.5 sm:p-3 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur shrink-0">
+              <button
+                onClick={() => setShowHeroGlobe(true)}
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-lg"
+              >
+                <GlobeIcon className="w-4 h-4 text-emerald-400" />
+                <span>Tampilkan Beranda Globe 3D</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* CONTAINER PETA & OVERLAY CONTROLS */}
+        <main className="flex-1 h-full relative z-10 overflow-hidden bg-slate-950">
+          
+          {/* FLOATING CONTROL BAR */}
+          {!showHeroGlobe && (
+            <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 z-20 pointer-events-none flex items-center justify-between gap-2">
+              <div className="pointer-events-auto flex items-center gap-2">
+                {!isSidebarOpen && (
+                  <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="bg-slate-900/90 text-white px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl border border-slate-700/80 shadow-2xl hover:bg-slate-800 transition flex items-center gap-2 text-xs font-bold backdrop-blur-md active:scale-95"
+                  >
+                    <Menu className="w-4 h-4 text-emerald-400" />
+                    <span>Daftar Lokasi</span>
+                  </button>
+                )}
+                <div className="bg-slate-900/80 border border-slate-800 backdrop-blur-md px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl shadow-xl flex items-center gap-2 text-xs text-white">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="font-semibold text-[10px] sm:text-[11px] hidden xs:inline sm:inline">Peta Toapaya</span>
+                  <span className="text-[10px] text-slate-400">({filteredList.length} titik)</span>
                 </div>
               </div>
-              <div className="flex gap-1">
+              <div className="pointer-events-auto flex items-center gap-2">
                 <button
-                  onClick={() => setIsEditOpen(true)}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs transition"
-                  title="Edit Lapak"
+                  onClick={() => setShowHeroGlobe(true)}
+                  className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl border border-slate-700/80 shadow-2xl transition flex items-center gap-2 text-xs font-semibold backdrop-blur-md active:scale-95"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => setCurrentOwner(null)}
-                  className="p-1.5 bg-red-950/50 hover:bg-red-900/60 text-red-300 rounded-lg text-xs transition border border-red-800/40"
-                  title="Keluar Log"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <GlobeIcon className="w-4 h-4 text-emerald-400" />
+                  <span className="hidden xs:inline sm:inline">Globe 3D</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Footer Sidebar Button */}
-          <div className="p-2.5 sm:p-3 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur shrink-0">
-            <button
-              onClick={() => setShowHeroGlobe(true)}
-              className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-lg"
-            >
-              <GlobeIcon className="w-4 h-4 text-emerald-400" />
-              <span>Tampilkan Beranda Globe 3D</span>
-            </button>
-          </div>
-        </aside>
-      )}
+          {/* Leaflet Map Canvas */}
+          <MapLeaflet
+            data={filteredList}
+            selectedUMKM={selectedUMKM}
+            onSelectUMKM={(item) => setSelectedUMKM(item)}
+            centerCoordinates={mapCenter}
+          />
 
-      {/* CONTAINER PETA & OVERLAY CONTROLS */}
-      <main className="flex-1 h-full relative z-10 overflow-hidden bg-slate-950">
-        
-        {/* FLOATING CONTROL BAR */}
-        {!showHeroGlobe && (
-          <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 z-20 pointer-events-none flex items-center justify-between gap-2">
-            
-            <div className="pointer-events-auto flex items-center gap-2">
-              {!isSidebarOpen && (
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="bg-slate-900/90 text-white px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl border border-slate-700/80 shadow-2xl hover:bg-slate-800 transition flex items-center gap-2 text-xs font-bold backdrop-blur-md active:scale-95"
-                >
-                  <Menu className="w-4 h-4 text-emerald-400" />
-                  <span>Daftar Lokasi</span>
-                </button>
-              )}
-              <div className="bg-slate-900/80 border border-slate-800 backdrop-blur-md px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl shadow-xl flex items-center gap-2 text-xs text-white">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-semibold text-[10px] sm:text-[11px] hidden xs:inline sm:inline">Peta Toapaya</span>
-                <span className="text-[10px] text-slate-400">({filteredList.length} titik)</span>
-              </div>
-            </div>
-
-            <div className="pointer-events-auto flex items-center gap-2">
-              <button
-                onClick={() => setShowHeroGlobe(true)}
-                className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl border border-slate-700/80 shadow-2xl transition flex items-center gap-2 text-xs font-semibold backdrop-blur-md active:scale-95"
-              >
-                <GlobeIcon className="w-4 h-4 text-emerald-400" />
-                <span className="hidden xs:inline sm:inline">Globe 3D</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Leaflet Map Canvas */}
-        <MapLeaflet
-          data={filteredList}
-          selectedUMKM={selectedUMKM}
-          onSelectUMKM={(item) => setSelectedUMKM(item)}
-          centerCoordinates={mapCenter}
-        />
-
-        {/* HERO OVERLAY MODERN DENGAN GLOBE 3D */}
-        {showHeroGlobe && (
-          <div className="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-xl flex flex-col justify-between p-4 sm:p-8 transition-all duration-500 overflow-y-auto">
-            
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] xs:w-[450px] sm:w-[700px] h-[320px] xs:h-[450px] sm:h-[700px] bg-emerald-500/10 rounded-full blur-[100px] sm:blur-[130px] pointer-events-none" />
-            <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] sm:w-[300px] h-[220px] sm:h-[300px] bg-teal-500/10 rounded-full blur-[80px] sm:blur-[100px] pointer-events-none" />
-
-            {/* HEADER HERO */}
-            <div className="relative z-10 flex items-center justify-between w-full max-w-6xl mx-auto gap-2">
-              <div
-                onClick={() => setShowHeroGlobe(true)}
-                className="flex items-center gap-2.5 sm:gap-3 cursor-pointer"
-              >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-slate-900 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/50 p-1.5 sm:p-2 shrink-0">
-                  <img src="/logo-kkn.png" alt="Logo Desa" className="w-full h-full object-contain" onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }} />
-                  <Compass className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div>
-                  <span className="text-[9px] sm:text-[10px] font-bold tracking-widest text-emerald-400 uppercase block">Peta Geospasial Digital</span>
-                  <h1 className="text-xs sm:text-base font-extrabold text-white">Desa Toapaya</h1>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowHeroGlobe(false)}
-                className="group bg-slate-900/80 hover:bg-emerald-600 text-slate-300 hover:text-white px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-800 hover:border-emerald-500 transition-all duration-300 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold shadow-xl backdrop-blur active:scale-95 shrink-0"
-              >
-                <span>Buka Peta</span>
-                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" />
-              </button>
-            </div>
-
-            {/* CONTENT UTAMA HERO */}
-            <div className="relative z-10 my-auto py-4 sm:py-6 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
+          {/* HERO OVERLAY MODERN DENGAN GLOBE 3D */}
+          {showHeroGlobe && (
+            <div className="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-xl flex flex-col justify-between p-4 sm:p-8 transition-all duration-500 overflow-y-auto">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] xs:w-[450px] sm:w-[700px] h-[320px] xs:h-[450px] sm:h-[700px] bg-emerald-500/10 rounded-full blur-[100px] sm:blur-[130px] pointer-events-none" />
+              <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] sm:w-[300px] h-[220px] sm:h-[300px] bg-teal-500/10 rounded-full blur-[80px] sm:blur-[100px] pointer-events-none" />
               
-              {/* GLOBE SECTION */}
-              <div className="lg:col-span-6 relative flex items-center justify-center order-1 lg:order-2">
-                <div className="hidden sm:flex absolute -top-2 left-4 z-20 bg-slate-900/90 border border-emerald-500/30 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-2xl items-center gap-2.5 text-xs text-white animate-bounce" style={{ animationDuration: '5s' }}>
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="font-semibold text-[11px]">Fitur Bubble Chat Realtime</span>
-                </div>
-
-                <div className="hidden sm:flex absolute bottom-2 right-2 z-20 bg-slate-900/90 border border-slate-700/80 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-2xl items-center gap-2.5 text-xs text-white">
-                  <Shield className="w-4 h-4 text-emerald-400" />
+              {/* HEADER HERO */}
+              <div className="relative z-10 flex items-center justify-between w-full max-w-6xl mx-auto gap-2">
+                <div
+                  onClick={() => setShowHeroGlobe(true)}
+                  className="flex items-center gap-2.5 sm:gap-3 cursor-pointer"
+                >
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-slate-900 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/50 p-1.5 sm:p-2 shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo-kkn.png" alt="Logo Desa" className="w-full h-full object-contain" />
+                  </div>
                   <div>
-                    <p className="text-[10px] text-slate-400 font-medium">Cakupan Wilayah</p>
-                    <p className="text-[11px] font-bold text-white">Dusun I & Dusun II</p>
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-widest text-emerald-400 uppercase block">Peta Geospasial Digital</span>
+                    <h1 className="text-xs sm:text-base font-extrabold text-white">Desa Toapaya</h1>
                   </div>
                 </div>
-
-                <div className="relative w-full max-w-[280px] xs:max-w-[320px] sm:max-w-[480px] h-[220px] xs:h-[260px] sm:h-[440px] flex items-center justify-center">
-                  <div className="absolute inset-2 sm:inset-4 rounded-full border border-dashed border-emerald-500/20 animate-spin" style={{ animationDuration: '45s' }} />
-                  <div className="absolute inset-8 sm:inset-12 rounded-full border border-emerald-500/10" />
-                  <Globe3D />
-                </div>
+                <button
+                  onClick={() => setShowHeroGlobe(false)}
+                  className="group bg-slate-900/80 hover:bg-emerald-600 text-slate-300 hover:text-white px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-800 hover:border-emerald-500 transition-all duration-300 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold shadow-xl backdrop-blur active:scale-95 shrink-0"
+                >
+                  <span>Buka Peta</span>
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" />
+                </button>
               </div>
 
-              {/* TEXT HERO SECTION */}
-              <div className="lg:col-span-6 space-y-3.5 sm:space-y-5 text-center lg:text-left order-2 lg:order-1">
-                <div className="inline-flex items-center gap-2 bg-slate-900/90 border border-emerald-500/30 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full backdrop-blur shadow-inner">
-                  <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 animate-spin" style={{ animationDuration: '8s' }} />
-                  <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-300 tracking-wide">Direktori Terintegrasi Wilayah</span>
-                </div>
-
-                <h2 className="text-2xl xs:text-3xl sm:text-5xl font-black text-white leading-[1.15] tracking-tight">
-                  Jelajahi Potensi <br className="hidden sm:block" />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
-                    UMKM & Desa Toapaya
-                  </span>
-                </h2>
-
-                <p className="text-[11px] sm:text-sm text-slate-300 leading-relaxed max-w-xl mx-auto lg:mx-0">
-                  Sistem informasi geografis interaktif berbasis visual 3D. Temukan komoditas unggulan lokal, fasilitas umum, sentra perikanan & pertanian, serta status live dari para pemilik lapak.
-                </p>
-
-                {/* Stat Grid */}
-                <div className="pt-1 sm:pt-2 grid grid-cols-3 gap-2 sm:gap-3 max-w-md mx-auto lg:mx-0 text-left">
-                  <div className="bg-slate-900/60 border border-slate-800 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur shadow-lg">
-                    <div className="flex items-center gap-1 text-emerald-400 text-[10px] sm:text-xs font-bold mb-0.5 sm:mb-1">
-                      <Store className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      <span>Lapak</span>
-                    </div>
-                    <p className="text-base sm:text-xl font-black text-white">{umkmList.length}+ <span className="text-[9px] sm:text-[10px] font-normal text-slate-400">Titik</span></p>
+              {/* CONTENT UTAMA HERO */}
+              <div className="relative z-10 my-auto py-4 sm:py-6 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
+                
+                {/* GLOBE SECTION */}
+                <div className="lg:col-span-6 relative flex items-center justify-center order-1 lg:order-2">
+                  <div className="hidden sm:flex absolute -top-2 left-4 z-20 bg-slate-900/90 border border-emerald-500/30 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-2xl items-center gap-2.5 text-xs text-white animate-bounce" style={{ animationDuration: '5s' }}>
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="font-semibold text-[11px]">Fitur Bubble Chat Realtime</span>
                   </div>
-
-                  <div className="bg-slate-900/60 border border-slate-800 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur shadow-lg">
-                    <div className="flex items-center gap-1 text-teal-400 text-[10px] sm:text-xs font-bold mb-0.5 sm:mb-1">
-                      <Layers className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      <span>Sektor</span>
+                  <div className="hidden sm:flex absolute bottom-2 right-2 z-20 bg-slate-900/90 border border-slate-700/80 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-2xl items-center gap-2.5 text-xs text-white">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-medium">Cakupan Wilayah</p>
+                      <p className="text-[11px] font-bold text-white">Dusun I & Dusun II</p>
                     </div>
-                    <p className="text-base sm:text-xl font-black text-white">6 <span className="text-[9px] sm:text-[10px] font-normal text-slate-400">Kategori</span></p>
                   </div>
-
-                  <div className="bg-slate-900/60 border border-slate-800 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur shadow-lg">
-                    <div className="flex items-center gap-1 text-cyan-400 text-[10px] sm:text-xs font-bold mb-0.5 sm:mb-1">
-                      <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      <span>Sistem</span>
-                    </div>
-                    <p className="text-base sm:text-xl font-black text-emerald-400">Live <span className="text-[9px] sm:text-[10px] font-normal text-slate-400">GIS</span></p>
+                  <div className="relative w-full max-w-[280px] xs:max-w-[320px] sm:max-w-[480px] h-[220px] xs:h-[260px] sm:h-[440px] flex items-center justify-center">
+                    <div className="absolute inset-2 sm:inset-4 rounded-full border border-dashed border-emerald-500/20 animate-spin" style={{ animationDuration: '45s' }} />
+                    <div className="absolute inset-8 sm:inset-12 rounded-full border border-emerald-500/10" />
+                    <Globe3D />
                   </div>
                 </div>
 
-                {/* Hero Action Buttons */}
-                <div className="pt-2 sm:pt-3 flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center justify-center lg:justify-start gap-2.5 sm:gap-3">
-                  <button
-                    onClick={() => setShowHeroGlobe(false)}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm py-3 sm:py-3.5 px-6 sm:px-7 rounded-2xl shadow-xl shadow-emerald-950/60 transition-all duration-200 flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    <Compass className="w-4 h-4" />
-                    <span>Mulai Eksplorasi Peta</span>
-                  </button>
+                {/* TEXT HERO SECTION */}
+                <div className="lg:col-span-6 space-y-3.5 sm:space-y-5 text-center lg:text-left order-2 lg:order-1">
+                  <div className="inline-flex items-center gap-2 bg-slate-900/90 border border-emerald-500/30 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full backdrop-blur shadow-inner">
+                    <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 animate-spin" style={{ animationDuration: '8s' }} />
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-300 tracking-wide">Direktori Terintegrasi Wilayah</span>
+                  </div>
+                  <h2 className="text-2xl xs:text-3xl sm:text-5xl font-black text-white leading-[1.15] tracking-tight">
+                    Jelajahi Potensi <br className="hidden sm:block" />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                      UMKM & Desa Toapaya
+                    </span>
+                  </h2>
+                  <p className="text-[11px] sm:text-sm text-slate-300 leading-relaxed max-w-xl mx-auto lg:mx-0">
+                    Sistem informasi geografis interaktif berbasis visual 3D. Temukan komoditas unggulan lokal, fasilitas umum, sentra perikanan & pertanian, serta status live dari para pemilik lapak.
+                  </p>
 
-                  {!currentOwner && (
+                  {/* Stat Grid */}
+                  <div className="pt-1 sm:pt-2 grid grid-cols-3 gap-2 sm:gap-3 max-w-md mx-auto lg:mx-0 text-left">
+                    <div className="bg-slate-900/60 border border-slate-800 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur shadow-lg">
+                      <div className="flex items-center gap-1 text-emerald-400 text-[10px] sm:text-xs font-bold mb-0.5 sm:mb-1">
+                        <Store className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <span>Lapak</span>
+                      </div>
+                      <p className="text-base sm:text-xl font-black text-white">{umkmList.length}+ <span className="text-[9px] sm:text-[10px] font-normal text-slate-400">Titik</span></p>
+                    </div>
+                    <div className="bg-slate-900/60 border border-slate-800 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur shadow-lg">
+                      <div className="flex items-center gap-1 text-teal-400 text-[10px] sm:text-xs font-bold mb-0.5 sm:mb-1">
+                        <Layers className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <span>Sektor</span>
+                      </div>
+                      <p className="text-base sm:text-xl font-black text-white">6 <span className="text-[9px] sm:text-[10px] font-normal text-slate-400">Kategori</span></p>
+                    </div>
+                    <div className="bg-slate-900/60 border border-slate-800 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur shadow-lg">
+                      <div className="flex items-center gap-1 text-cyan-400 text-[10px] sm:text-xs font-bold mb-0.5 sm:mb-1">
+                        <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <span>Sistem</span>
+                      </div>
+                      <p className="text-base sm:text-xl font-black text-emerald-400">Live <span className="text-[9px] sm:text-[10px] font-normal text-slate-400">GIS</span></p>
+                    </div>
+                  </div>
+
+                  {/* Hero Action Buttons */}
+                  <div className="pt-2 sm:pt-3 flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center justify-center lg:justify-start gap-2.5 sm:gap-3">
                     <button
-                      onClick={() => setIsAuthOpen(true)}
-                      className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs sm:text-sm py-3 sm:py-3.5 px-5 sm:px-6 rounded-2xl border border-slate-700/80 transition flex items-center justify-center gap-2 backdrop-blur active:scale-95"
+                      onClick={() => setShowHeroGlobe(false)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm py-3 sm:py-3.5 px-6 sm:px-7 rounded-2xl shadow-xl shadow-emerald-950/60 transition-all duration-200 flex items-center justify-center gap-2 active:scale-95"
                     >
-                      <Store className="w-4 h-4 text-emerald-400" />
-                      <span>Login Pemilik Lapak</span>
+                      <Compass className="w-4 h-4" />
+                      <span>Mulai Eksplorasi Peta</span>
                     </button>
-                  )}
+                    {!currentOwner && (
+                      <button
+                        onClick={() => setIsAuthOpen(true)}
+                        className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs sm:text-sm py-3 sm:py-3.5 px-5 sm:px-6 rounded-2xl border border-slate-700/80 transition flex items-center justify-center gap-2 backdrop-blur active:scale-95"
+                      >
+                        <Store className="w-4 h-4 text-emerald-400" />
+                        <span>Login Pemilik Lapak</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* FOOTER HERO */}
+              <div className="relative z-10 w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-[10px] sm:text-[11px] text-slate-400 border-t border-slate-800/80 pt-3 gap-1.5 text-center sm:text-left">
+                <p>© 2026 KKN 27 Desa Toapaya — Sistem Pemetaan Geospasial UMKM</p>
+                <div className="flex items-center gap-4">
+                  <span className="text-slate-400">Presisi Koordinat & Data Terverifikasi</span>
                 </div>
               </div>
             </div>
-
-            {/* FOOTER HERO */}
-            <div className="relative z-10 w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-[10px] sm:text-[11px] text-slate-400 border-t border-slate-800/80 pt-3 gap-1.5 text-center sm:text-left">
-              <p>© 2026 KKN Desa Toapaya — Sistem Pemetaan Geospasial UMKM</p>
-              <div className="flex items-center gap-4">
-                <span className="text-slate-400">Presisi Koordinat & Data Terverifikasi</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
 
       {/* MODAL DETAIL LOKASI */}
       {selectedUMKM && (
@@ -800,18 +637,17 @@ export default function Page() {
             onClick={(e) => e.stopPropagation()}
             className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl relative max-h-[85vh] sm:max-h-[90vh] overflow-y-auto flex flex-col gap-4 text-white"
           >
-            {/* Gambar Header & Tombol Tutup */}
+            {/* Header Image & Close Button */}
             <div className="relative w-full h-44 sm:h-52 rounded-2xl overflow-hidden shrink-0 bg-slate-800">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={selectedUMKM.foto || 'https://images.unsplash.com/photo-1550258987-190a2d41a8ba?auto=format&fit=crop&w=800&q=80'} 
                 alt={selectedUMKM.nama} 
                 className="w-full h-full object-cover"
-                loading="lazy"
               />
               <button 
                 onClick={() => setSelectedUMKM(null)}
                 className="absolute top-3 right-3 p-2 bg-slate-950/80 hover:bg-slate-900 text-slate-300 hover:text-white rounded-full border border-slate-700/80 transition active:scale-95"
-                aria-label="Tutup detail"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -825,7 +661,7 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Konten Detail */}
+            {/* Content Details */}
             <div className="space-y-3">
               <div>
                 <h2 className="text-lg sm:text-xl font-extrabold text-white">{selectedUMKM.nama}</h2>
@@ -834,20 +670,17 @@ export default function Page() {
                   <span>{selectedUMKM.alamat_lengkap || 'Desa Toapaya'}</span>
                 </p>
               </div>
-
               {selectedUMKM.status_owner && (
                 <div className="p-3 bg-amber-950/40 border border-amber-500/30 rounded-xl text-amber-200 text-xs">
                   <span className="font-bold block mb-0.5">💬 Pesan Live Pemilik:</span>
-                  "{selectedUMKM.status_owner}"
+                  &quot;{selectedUMKM.status_owner}&quot;
                 </div>
               )}
-
               {selectedUMKM.deskripsi && (
                 <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/50 p-3 rounded-xl border border-slate-800">
                   {selectedUMKM.deskripsi}
                 </p>
               )}
-
               {Array.isArray(selectedUMKM.produk) && selectedUMKM.produk.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-slate-400 mb-1.5">Produk & Layanan Utama:</p>
@@ -862,7 +695,7 @@ export default function Page() {
               )}
             </div>
 
-            {/* Tombol Aksi & Kontak */}
+            {/* Actions / Contact Buttons */}
             <div className="pt-2 flex flex-col xs:flex-row gap-2 border-t border-slate-800/80">
               {selectedUMKM.kontak && (
                 <a
@@ -893,15 +726,15 @@ export default function Page() {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        onSuccess={handleLoginSuccess}
+        onLoginSuccess={handleLoginSuccess}
+        umkmList={umkmList}
       />
-
       {currentOwner && (
         <EditLapakModal
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
           currentData={currentOwner}
-          onUpdateSuccess={handleUpdateData}
+          onUpdateSuccess={fetchData}
         />
       )}
     </div>

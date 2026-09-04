@@ -8,11 +8,11 @@ import { X, Store, Building2, Lock, Phone, CheckCircle2, AlertCircle, MessageSqu
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (umkm: UMKM) => void; // Disesuaikan dengan onSuccess di page.tsx
+  onLoginSuccess: (umkm: UMKM) => void;
   umkmList?: UMKM[];
 }
 
-export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -75,7 +75,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         return;
       }
 
-      onSuccess(data as UMKM);
+      onLoginSuccess(data as UMKM);
       onClose();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Gagal login.';
