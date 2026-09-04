@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { UMKM } from '@/data/umkm';
 import { X, MessageSquare, Save, CheckCircle2, AlertCircle, Store } from 'lucide-react';
@@ -8,24 +8,34 @@ import { X, MessageSquare, Save, CheckCircle2, AlertCircle, Store } from 'lucide
 interface EditLapakModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentOwner: UMKM;
-  onSuccess: () => void;
+  currentData: UMKM; // Disesuaikan dengan prop dari app/page.tsx
+  onUpdateSuccess: () => void | Promise<void>; // Disesuaikan dengan prop dari app/page.tsx
 }
 
 export default function EditLapakModal({
   isOpen,
   onClose,
-  currentOwner,
-  onSuccess,
+  currentData,
+  onUpdateSuccess,
 }: EditLapakModalProps) {
-  const [statusOwner, setStatusOwner] = useState(currentOwner.status_owner || '');
-  const [nama, setNama] = useState(currentOwner.nama || '');
-  const [deskripsi, setDeskripsi] = useState(currentOwner.deskripsi || '');
-  const [alamat, setAlamat] = useState(currentOwner.alamat_lengkap || '');
+  const [statusOwner, setStatusOwner] = useState('');
+  const [nama, setNama] = useState('');
+  const [deskripsi, setDeskripsi] = useState('');
+  const [alamat, setAlamat] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  if (!isOpen || !currentOwner) return null;
+  // Sync state ketika currentData berubah
+  useEffect(() => {
+    if (currentData) {
+      setStatusOwner(currentData.status_owner || '');
+      setNama(currentData.nama || '');
+      setDeskripsi(currentData.deskripsi || '');
+      setAlamat(currentData.alamat_lengkap || '');
+    }
+  }, [currentData]);
+
+  if (!isOpen || !currentData) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +50,7 @@ export default function EditLapakModal({
         deskripsi,
         alamat_lengkap: alamat,
       })
-      .eq('id', currentOwner.id);
+      .eq('id', currentData.id);
 
     setIsSubmitting(false);
 
@@ -50,8 +60,9 @@ export default function EditLapakModal({
     }
 
     setMsg({ type: 'success', text: 'Data lapak & bubble chat berhasil diperbarui!' });
-    onSuccess();
+    await onUpdateSuccess();
     setTimeout(() => {
+      setMsg(null);
       onClose();
     }, 1200);
   };

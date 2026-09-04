@@ -9,6 +9,7 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (umkm: UMKM) => void;
+  umkmList?: UMKM[]; // Ditambahkan agar tidak error di app/page.tsx
 }
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
@@ -29,7 +30,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   const [rtRw, setRtRw] = useState('RT 01 / RW 01');
   const [alamat, setAlamat] = useState('');
   const [deskripsi, setDeskripsi] = useState('');
-  const [statusOwner, setStatusOwner] = useState(''); // Kolom status_owner
+  const [statusOwner, setStatusOwner] = useState('');
   const [produkInput, setProdukInput] = useState('');
   const [hargaMulai, setHargaMulai] = useState('');
   const [jamBuka, setJamBuka] = useState('08:00 - 20:00 WIB');
@@ -74,10 +75,11 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         return;
       }
 
-      onLoginSuccess(data);
+      onLoginSuccess(data as UMKM);
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Gagal login.');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Gagal login.';
+      setErrorMsg(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -103,7 +105,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
       rt_rw: rtRw,
       alamat_lengkap: alamat,
       deskripsi: deskripsi || 'Lokasi terdaftar warga.',
-      status_owner: statusOwner || '', // Mengirim status_owner ke Supabase
+      status_owner: statusOwner || '',
       produk: produkArray,
       harga_mulai: tipeLokasi === 'umkm' ? hargaMulai : undefined,
       jam_buka: jamBuka,
@@ -259,7 +261,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
               />
             </div>
 
-            {/* Field Tambahan: Status / Bubble Chat awal */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Pesan Live / Bubble Chat (Opsional)</label>
               <div className="relative">
@@ -303,7 +304,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Dusun</label>
                 <select
                   value={dusun}
-                  onChange={(e) => setDusun(e.target.value as any)}
+                  onChange={(e) => setDusun(e.target.value as 'Dusun I' | 'Dusun II')}
                   className="w-full bg-slate-950 text-white text-xs rounded-xl p-2.5 border border-slate-800 focus:outline-none"
                 >
                   <option value="Dusun I">Dusun I</option>

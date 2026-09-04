@@ -11,22 +11,23 @@ export type KategoriLokasi =
 export interface UMKM {
   id: string;
   nama: string;
-  tipe_lokasi: TipeLokasi; // 'umkm' atau 'non_umkm'
+  tipe_lokasi: TipeLokasi;
   kategori: KategoriLokasi;
   dusun: 'Dusun I' | 'Dusun II';
   rt_rw: string;
   lat: number;
   lng: number;
   deskripsi: string;
-  produk?: string[]; // Opsional untuk Non-UMKM
+  produk?: string[];
   jam_buka: string;
   whatsapp: string;
+  kontak?: string; // Ditambahkan untuk kompatibilitas
   status_panen?: string;
   status_owner?: string | null;
+  status_persetujuan?: 'pending' | 'approved' | 'rejected'; // Ditambahkan untuk sistem verifikasi admin
   pin_owner: string;
-  harga_mulai?: string; // Opsional untuk Non-UMKM
+  harga_mulai?: string;
   foto: string;
   alamat_lengkap: string;
   created_at?: string;
 }
-
