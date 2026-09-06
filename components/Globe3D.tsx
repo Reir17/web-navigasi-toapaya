@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const TEXT_SEQUENCE = ['W', 'A', 'M', 'B', 'U', 'L', '✦', '•', '+', '°', '✧', '•', '◇'];
+const TEXT_SEQUENCE = ['T', 'O', 'A', 'P', 'A', 'Y', 'A', '✦', '•', '+', '°', '✧', '•', '◇'];
 
 interface BurstParticle {
   x: number;
@@ -84,6 +84,7 @@ export default function Globe3D() {
 
       for (let i = 0; i < itemsPerLoop; i++) {
         const char = TEXT_SEQUENCE[seqIdx % TEXT_SEQUENCE.length];
+        const isLetter = 'TOAPAYA'.includes(char);
         paths.push({
           char,
           theta: (Math.PI * 2 * i) / itemsPerLoop,
@@ -91,8 +92,8 @@ export default function Globe3D() {
           inclination,
           azimuth,
           speedOffset: 0.7 + (l % 3) * 0.25,
-          baseSize: 'WAMBUL'.includes(char) ? (isMobile ? 11 : 14) : (isMobile ? 8 : 10),
-          isLetter: 'WAMBUL'.includes(char),
+          baseSize: isLetter ? (isMobile ? 11 : 14) : (isMobile ? 8 : 10),
+          isLetter,
         });
         seqIdx++;
       }
@@ -304,7 +305,7 @@ export default function Globe3D() {
         clickCountRef.current = 0;
       }, 1500);
 
-      // Jika mencapai 10 klik!
+      // Jika mencapai 10 klik
       if (clickCountRef.current >= 10) {
         clickCountRef.current = 0;
         
@@ -312,7 +313,7 @@ export default function Globe3D() {
         setShowThankYou(true);
         triggerBurst(clientX, clientY, true);
 
-        // Auto hidupkan kembali timer hapus pesan
+        // Timer hapus pesan otomatis
         if (thankYouTimeoutRef.current) clearTimeout(thankYouTimeoutRef.current);
         thankYouTimeoutRef.current = setTimeout(() => {
           setShowThankYou(false);
@@ -328,6 +329,7 @@ export default function Globe3D() {
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length > 0) {
+        e.preventDefault(); // Mencegah emulasi event click ganda di mobile
         updatePointerPos(e.touches[0].clientX, e.touches[0].clientY);
         handleSpamClick(e.touches[0].clientX, e.touches[0].clientY);
       }
@@ -344,7 +346,7 @@ export default function Globe3D() {
     canvas.addEventListener('mouseleave', handleMouseLeave);
     canvas.addEventListener('click', handleClick);
     canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchend', handleMouseLeave);
     window.addEventListener('resize', handleResize);
 
